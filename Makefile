@@ -38,7 +38,7 @@ TESTDIR  := tests
 BUILDDIR := build
 
 # Source files (library)
-LIB_SRCS := $(SRCDIR)/tsmm_naive.c $(SRCDIR)/tsmm_utils.c
+LIB_SRCS := $(SRCDIR)/tsmm_naive.c $(SRCDIR)/tsmm_tiled.c $(SRCDIR)/tsmm_utils.c
 LIB_OBJS := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(LIB_SRCS))
 
 # Test executables
@@ -81,7 +81,8 @@ CFLAGS += -fopenmp
 LDFLAGS += -fopenmp
 
 # --- Build targets -----------------------------------------------------
-.PHONY: all blas lib test benchmark slurm clean help
+.PHONY: all blas lib test benchmark slurm clean help \
+        check bench-submit profile-submit
 
 all: lib $(TEST_CORRECT) $(BENCHMARK)
 	@echo "==> Build complete (no BLAS).  Use 'make blas BLAS=openblas' for BLAS."
@@ -127,17 +128,22 @@ benchmark-csv: $(BENCHMARK)
 	$(BENCHMARK) --csv
 
 # --- SLURM submission --------------------------------------------------
+
+# old combined script (kept for backward compat)
 slurm:
 	sbatch scripts/run_slurm.sh
 
-bench-full:
+# correctness only
+check:
+	sbatch scripts/run_correctness.sh
+
+# performance benchmark (GFLOPS, BW, AI)
+bench-submit:
 	sbatch scripts/run_benchmark.sh
 
-bench-full-mkl:
-	sbatch scripts/run_benchmark.sh --blas mkl
-
-bench-full-openblas:
-	sbatch scripts/run_benchmark.sh --blas openblas
+# hardware profiling (cache miss, CPI, branch miss)
+profile-submit:
+	sbatch scripts/run_profile.sh
 
 # --- Cleanup -----------------------------------------------------------
 clean:

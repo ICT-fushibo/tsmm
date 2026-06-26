@@ -12,9 +12,6 @@ extern "C" {
  *
  * A is k x m, B is k x n, C is m x n.  All matrices are double-precision
  * (IEEE 754 binary64).  Dense, no special structure assumed.
- *
- * This header defines the public API: layout enum, problem shapes, performance
- * counters, and the kernel / utility function signatures.
  * --------------------------------------------------------------------------- */
 
 /* ---------- Matrix storage layout ---------- */
@@ -30,8 +27,7 @@ typedef enum {
 typedef struct {
     /* Primary timing */
     double wall_time_ms;        /* wall-clock elapsed (ms)         */
-    double cpu_time_ms;         /* CPU time (ms) – meaningful with
-                                   multi-threading later           */
+    double cpu_time_ms;         /* CPU time (ms)                   */
 
     /* Compute */
     double total_flops;         /* 2 * m * n * k (fma counts 2)   */
@@ -48,7 +44,7 @@ typedef struct {
     int    num_threads;         /* threads used (1 for serial)     */
     int    m, n, k;             /* problem dimensions (cached)     */
 
-    /* Reserved for future use (PAPI counters, cache misses, …)   */
+    /* Reserved for future use (PAPI counters, cache misses, ...) */
     double l1_miss_ratio;
     double l2_miss_ratio;
     double l3_miss_ratio;
@@ -57,7 +53,7 @@ typedef struct {
 /* ---------- Pre-defined problem shapes ---------- */
 typedef struct {
     int m, n, k;
-    const char *name;           /* human-readable label            */
+    const char *name;
 } tsmm_shape_t;
 
 #define TSMM_NUM_SHAPES 8
@@ -65,24 +61,39 @@ extern const tsmm_shape_t tsmm_shapes[TSMM_NUM_SHAPES];
 
 /* ---------- TSMM kernels (naive / serial baseline) ---------- */
 
-/* C = A^T * B  — row-major.
- * Caller must zero-initialise C (m*n doubles) before calling.      */
 void tsmm_naive_rowmajor(int m, int n, int k,
                          const double *A, const double *B, double *C);
-
-/* C = A^T * B  — column-major.
- * Caller must zero-initialise C (m*n doubles) before calling.      */
 void tsmm_naive_colmajor(int m, int n, int k,
                          const double *A, const double *B, double *C);
-
-/* Generic dispatch by layout. */
 void tsmm_naive(tsmm_layout_t layout, int m, int n, int k,
                 const double *A, const double *B, double *C);
 
-/* Simple, obviously-correct reference (inner-product triple loop).
- * Only intended for correctness checking on small shapes.          */
 void tsmm_reference(tsmm_layout_t layout, int m, int n, int k,
                     const double *A, const double *B, double *C);
+
+/* ---------- Tiled kernels (serial, cache-blocked) ---------- */
+
+/* 3D tiling (m, n, k).  Ti,Tj,Tk -- tile sizes, runtime-tunable. */
+void tsmm_tiled_rowmajor(int m, int n, int k,
+                         const double *A, const double *B, double *C,
+                         int Ti, int Tj, int Tk);
+void tsmm_tiled_colmajor(int m, int n, int k,
+                         const double *A, const double *B, double *C,
+                         int Ti, int Tj, int Tk);
+void tsmm_tiled(tsmm_layout_t layout, int m, int n, int k,
+                const double *A, const double *B, double *C,
+                int Ti, int Tj, int Tk);
+
+/* 2D tiling (m, n only; k traversed in full per tile). */
+void tsmm_tiled_mn_rowmajor(int m, int n, int k,
+                            const double *A, const double *B, double *C,
+                            int Ti, int Tj);
+void tsmm_tiled_mn_colmajor(int m, int n, int k,
+                            const double *A, const double *B, double *C,
+                            int Ti, int Tj);
+void tsmm_tiled_mn(tsmm_layout_t layout, int m, int n, int k,
+                   const double *A, const double *B, double *C,
+                   int Ti, int Tj);
 
 /* ---------- BLAS wrapper (requires -DTSMM_USE_BLAS) ---------- */
 #ifdef TSMM_USE_BLAS
@@ -91,27 +102,14 @@ void tsmm_blas(tsmm_layout_t layout, int m, int n, int k,
 #endif
 
 /* ---------- Memory management ---------- */
-
-/* Allocate an aligned rows x cols matrix. */
 double* tsmm_alloc_matrix(int rows, int cols);
-
-/* Free a matrix allocated by tsmm_alloc_matrix. */
 void    tsmm_free_matrix(double *mat);
-
-/* Fill matrix with uniform random values in [0, 1). */
 void    tsmm_init_random(double *mat, int rows, int cols);
-
-/* Zero a matrix. */
 void    tsmm_init_zero(double *mat, int rows, int cols);
 
 /* ---------- Correctness ---------- */
-
-/* Return the max absolute difference between C1 and C2 (both rows x cols).
- * Returns -1.0 on dimension mismatch. */
 double  tsmm_max_abs_diff(const double *C1, const double *C2,
                           int rows, int cols);
-
-/* Verify C1 ≈ C2 within tolerance (relative error).                */
 int     tsmm_verify(const double *C1, const double *C2,
                     int rows, int cols, double tol);
 
