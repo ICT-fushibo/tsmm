@@ -28,7 +28,7 @@ KERNEL="${KERNEL:-all}"         # naive | tiled_3d | tiled_mn | all
 TILE_M="${TILE_M:-64}"
 TILE_N="${TILE_N:-256}"
 TILE_K="${TILE_K:-256}"
-RUNS="${RUNS:-20}"
+RUNS="${RUNS:-10}"
 SHAPE="${SHAPE:-all}"           # all | 1-8
 LAYOUT="${LAYOUT:-all}"         # all | row | col
 

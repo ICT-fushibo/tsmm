@@ -95,6 +95,31 @@ void tsmm_tiled_mn(tsmm_layout_t layout, int m, int n, int k,
                    const double *A, const double *B, double *C,
                    int Ti, int Tj);
 
+/* ---------- OpenMP tiled kernels (multi-threaded, row-major only) ---------- */
+
+/* 3D tiling + OpenMP.  num_threads=0 → use OMP_NUM_THREADS env var.
+ * col-major variants dispatch to serial tiled (no OMP optimisation).   */
+void tsmm_tiled_omp_rowmajor(int m, int n, int k,
+                              const double *A, const double *B, double *C,
+                              int Ti, int Tj, int Tk, int num_threads);
+void tsmm_tiled_omp_colmajor(int m, int n, int k,
+                              const double *A, const double *B, double *C,
+                              int Ti, int Tj, int Tk, int num_threads);
+void tsmm_tiled_omp(tsmm_layout_t layout, int m, int n, int k,
+                    const double *A, const double *B, double *C,
+                    int Ti, int Tj, int Tk, int num_threads);
+
+/* 2D tiling + OpenMP. */
+void tsmm_tiled_omp_mn_rowmajor(int m, int n, int k,
+                                 const double *A, const double *B, double *C,
+                                 int Ti, int Tj, int num_threads);
+void tsmm_tiled_omp_mn_colmajor(int m, int n, int k,
+                                 const double *A, const double *B, double *C,
+                                 int Ti, int Tj, int num_threads);
+void tsmm_tiled_omp_mn(tsmm_layout_t layout, int m, int n, int k,
+                        const double *A, const double *B, double *C,
+                        int Ti, int Tj, int num_threads);
+
 /* ---------- BLAS wrapper (requires -DTSMM_USE_BLAS) ---------- */
 #ifdef TSMM_USE_BLAS
 void tsmm_blas(tsmm_layout_t layout, int m, int n, int k,

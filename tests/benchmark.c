@@ -33,10 +33,13 @@
 #define DEFAULT_Tk  256
 
 /* Kernel 选择位掩码 */
-#define KERNEL_NAIVE     (1<<0)
-#define KERNEL_TILED_3D  (1<<1)
-#define KERNEL_TILED_MN  (1<<2)
-#define KERNEL_ALL       (KERNEL_NAIVE | KERNEL_TILED_3D | KERNEL_TILED_MN)
+#define KERNEL_NAIVE       (1<<0)
+#define KERNEL_TILED_3D    (1<<1)
+#define KERNEL_TILED_MN    (1<<2)
+#define KERNEL_TILED_OMP_3D (1<<3)
+#define KERNEL_TILED_OMP_MN (1<<4)
+#define KERNEL_ALL         (KERNEL_NAIVE | KERNEL_TILED_3D | KERNEL_TILED_MN | \
+                            KERNEL_TILED_OMP_3D | KERNEL_TILED_OMP_MN)
 
 /* ---------- 命令行选项 ---------- */
 typedef struct {
@@ -104,6 +107,43 @@ static void bench_and_report(const char *kernel_name,
                    p_baseline->wall_time_ms / p.wall_time_ms);
         }
     }
+}
+
+/* --- OMP kernel timing helpers --- */
+static double time_tiled_omp_3d(tsmm_layout_t layout,
+                                 int m, int n, int k,
+                                 const double *A, const double *B,
+                                 double *C, int nruns,
+                                 int Ti, int Tj, int Tk, int nthreads)
+{
+    double min_time = 1e100;
+    for (int i = 0; i < nruns; i++) {
+        tsmm_init_zero(C, m, n);
+        double t1 = tsmm_wall_time();
+        tsmm_tiled_omp(layout, m, n, k, A, B, C, Ti, Tj, Tk, nthreads);
+        double t2 = tsmm_wall_time();
+        double elapsed = t2 - t1;
+        if (elapsed < min_time) min_time = elapsed;
+    }
+    return min_time;
+}
+
+static double time_tiled_omp_mn(tsmm_layout_t layout,
+                                 int m, int n, int k,
+                                 const double *A, const double *B,
+                                 double *C, int nruns,
+                                 int Ti, int Tj, int nthreads)
+{
+    double min_time = 1e100;
+    for (int i = 0; i < nruns; i++) {
+        tsmm_init_zero(C, m, n);
+        double t1 = tsmm_wall_time();
+        tsmm_tiled_omp_mn(layout, m, n, k, A, B, C, Ti, Tj, nthreads);
+        double t2 = tsmm_wall_time();
+        double elapsed = t2 - t1;
+        if (elapsed < min_time) min_time = elapsed;
+    }
+    return min_time;
 }
 
 /* ========================================================================== */
@@ -202,6 +242,48 @@ static void bench_one(const tsmm_shape_t *shape, tsmm_layout_t layout,
                          have_baseline ? &p_naive_baseline : NULL);
     }
 
+    /* 4. Tiled OMP 3D */
+    if (opts->kernel_mask & KERNEL_TILED_OMP_3D) {
+        double t = time_tiled_omp_3d(layout, m, n, k, A, B, C,
+                                     opts->nruns,
+                                     opts->Ti, opts->Tj, opts->Tk,
+                                     opts->num_threads);
+        tsmm_perf_t p = tsmm_compute_perf(m, n, k, t * 1000.0,
+                                           opts->num_threads);
+        p.num_threads = opts->num_threads;
+        if (opts->csv_output)
+            emit_csv("tiled_omp_3d", shape, lname, &p);
+        else {
+            printf("  --- tiled_omp_3d (nt=%d Ti=%d Tj=%d Tk=%d) ---\n",
+                   opts->num_threads, opts->Ti, opts->Tj, opts->Tk);
+            tsmm_print_perf(&p);
+            if (have_baseline)
+                printf("  Speedup vs naive: %.2fx\n",
+                       p_naive_baseline.wall_time_ms / p.wall_time_ms);
+        }
+    }
+
+    /* 5. Tiled OMP MN-only */
+    if (opts->kernel_mask & KERNEL_TILED_OMP_MN) {
+        double t = time_tiled_omp_mn(layout, m, n, k, A, B, C,
+                                     opts->nruns,
+                                     opts->Ti, opts->Tj,
+                                     opts->num_threads);
+        tsmm_perf_t p = tsmm_compute_perf(m, n, k, t * 1000.0,
+                                           opts->num_threads);
+        p.num_threads = opts->num_threads;
+        if (opts->csv_output)
+            emit_csv("tiled_omp_mn", shape, lname, &p);
+        else {
+            printf("  --- tiled_omp_mn (nt=%d Ti=%d Tj=%d) ---\n",
+                   opts->num_threads, opts->Ti, opts->Tj);
+            tsmm_print_perf(&p);
+            if (have_baseline)
+                printf("  Speedup vs naive: %.2fx\n",
+                       p_naive_baseline.wall_time_ms / p.wall_time_ms);
+        }
+    }
+
     tsmm_free_matrix(A);
     tsmm_free_matrix(B);
     tsmm_free_matrix(C);
@@ -234,10 +316,13 @@ static void parse_args(int argc, char **argv, bench_opts_t *opts)
             opts->no_blas = 1;
         else if (!strcmp(argv[i], "--kernel") && i + 1 < argc) {
             char *k = argv[++i];
-            if      (!strcmp(k, "naive"))    opts->kernel_mask = KERNEL_NAIVE;
-            else if (!strcmp(k, "tiled_3d")) opts->kernel_mask = KERNEL_TILED_3D;
-            else if (!strcmp(k, "tiled_mn")) opts->kernel_mask = KERNEL_TILED_MN;
-            else if (!strcmp(k, "all"))      opts->kernel_mask = KERNEL_ALL;
+            if      (!strcmp(k, "naive"))         opts->kernel_mask = KERNEL_NAIVE;
+            else if (!strcmp(k, "tiled_3d"))      opts->kernel_mask = KERNEL_TILED_3D;
+            else if (!strcmp(k, "tiled_mn"))      opts->kernel_mask = KERNEL_TILED_MN;
+            else if (!strcmp(k, "tiled_omp_3d"))  opts->kernel_mask = KERNEL_TILED_OMP_3D;
+            else if (!strcmp(k, "tiled_omp_mn"))  opts->kernel_mask = KERNEL_TILED_OMP_MN;
+            else if (!strcmp(k, "all"))           opts->kernel_mask = KERNEL_ALL;
+            else if (!strcmp(k, "all_omp"))       opts->kernel_mask = KERNEL_TILED_OMP_3D | KERNEL_TILED_OMP_MN;
             else { fprintf(stderr, "Unknown kernel: %s\n", k); exit(1); }
         }
         else if (!strcmp(argv[i], "--no-tiled"))

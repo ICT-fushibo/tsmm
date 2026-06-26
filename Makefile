@@ -38,12 +38,13 @@ TESTDIR  := tests
 BUILDDIR := build
 
 # Source files (library)
-LIB_SRCS := $(SRCDIR)/tsmm_naive.c $(SRCDIR)/tsmm_tiled.c $(SRCDIR)/tsmm_utils.c
+LIB_SRCS := $(SRCDIR)/tsmm_naive.c $(SRCDIR)/tsmm_tiled.c $(SRCDIR)/tsmm_tiled_omp.c $(SRCDIR)/tsmm_utils.c
 LIB_OBJS := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(LIB_SRCS))
 
-# Test executables
-TEST_CORRECT := $(BUILDDIR)/test_correctness
-BENCHMARK    := $(BUILDDIR)/benchmark
+# Test executables (BIN_SUFFIX for isolated builds, e.g. _omp)
+BIN_SUFFIX   ?=
+TEST_CORRECT := $(BUILDDIR)/test_correctness$(BIN_SUFFIX)
+BENCHMARK    := $(BUILDDIR)/benchmark$(BIN_SUFFIX)
 
 # --- BLAS configuration ------------------------------------------------
 # BLAS=openblas  → use pkg-config

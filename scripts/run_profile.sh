@@ -39,8 +39,8 @@ KERNEL_LIST="${KERNEL:-naive tiled_3d tiled_mn}"   # 空格分隔，逐个测
 TILE_M="${TILE_M:-64}"
 TILE_N="${TILE_N:-256}"
 TILE_K="${TILE_K:-256}"
-RUNS="${RUNS:-5}"             # profiling 时 runs 少一点，perf 开销大
-SHAPE="${SHAPE:-4}"           # 默认只测 shape 4 (144x144x144, 较快)
+RUNS="${RUNS:-3}"             # profiling 时 runs 少一点，perf 开销大
+SHAPE="${SHAPE:-all}"         # 默认测全部 shape
 LAYOUT="${LAYOUT:-row}"       # 默认只测 row-major
 
 echo "=== TSMM Hardware Profiling [${TAG:-default}] ==="

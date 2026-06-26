@@ -29,6 +29,7 @@ if [ "${NO_BUILD:-0}" != "1" ]; then
 fi
 
 export OMP_NUM_THREADS=1
-./build/test_correctness
+BIN_SUFFIX="${BIN_SUFFIX:-}"
+./build/test_correctness${BIN_SUFFIX}
 echo ""
 echo "=== Done at $(date) ==="
