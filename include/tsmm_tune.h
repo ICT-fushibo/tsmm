@@ -14,6 +14,7 @@
 #define TSMM_TUNE_H
 
 #include "tsmm.h"
+#include <string.h>
 
 /* one entry per (shape, thread count) */
 typedef struct {
@@ -106,6 +107,9 @@ static inline int tsmm_optimal(int shape_idx,
     } else if (!strcmp(e.kernel, "avx512_s5")) {
         (void)num_threads;
         tsmm_avx512_s5(layout, m, n, k, A, B, C, e.Ti, e.Tj, e.Tk);
+    } else if (!strcmp(e.kernel, "avx512_s5_omp")) {
+        tsmm_avx512_s5_omp(layout, m, n, k, A, B, C,
+                           e.Ti, e.Tj, e.Tk, num_threads);
     } else {
         /* fallback: S3 3D with defaults */
         tsmm_tiled_omp_s3(layout, m, n, k, A, B, C,

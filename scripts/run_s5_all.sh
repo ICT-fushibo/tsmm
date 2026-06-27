@@ -12,25 +12,25 @@ echo ""
 
 echo "=== Submitting S5 jobs ==="
 
-# 1. Correctness (serial, 1 thread)
-echo "  -> correctness"
-sbatch --job-name="chk_s5" \
-       --output="logs/check_s5_%j.out" --error="logs/check_s5_%j.err" \
-       --export=ALL,BIN_SUFFIX=_s5,KERNEL=avx512_s5,THREADS=1 \
-       scripts/run_correctness_omp.sh
+# 1. Correctness (single job: serial + all thread counts OMP)
+echo "  -> correctness (serial + 1..96 threads)"
+sbatch --job-name="chk_s5_all" \
+       --output="logs/check_s5_all_%j.out" --error="logs/check_s5_all_%j.err" \
+       --export=ALL,BIN_SUFFIX=_s5,KERNEL=avx512_s5_omp \
+       scripts/run_correctness_omp_all.sh
 
-# 2. Benchmark (all shapes, row+col)
+# 2. Benchmark (all shapes, row only, sweep 1/24/48/96 threads)
 echo "  -> benchmark"
 sbatch --job-name="bm_s5" \
        --output="logs/bench_s5_%j.out" --error="logs/bench_s5_%j.err" \
-       --export=ALL,KERNEL=avx512_s5,SHAPE=all,NO_BUILD=1 \
+       --export=ALL,KERNEL=avx512_s5_omp,SHAPE=all,NO_BUILD=1 \
        scripts/run_benchmark_s5.sh
 
-# 3. Profile (all shapes, row only, perf stat)
+# 3. Profile (all shapes, sweep 1/24/48/96 threads)
 echo "  -> profile"
 sbatch --job-name="pf_s5" \
        --output="logs/prof_s5_%j.out" --error="logs/prof_s5_%j.err" \
-       --export=ALL,KERNEL=avx512_s5,SHAPE=all,NO_BUILD=1 \
+       --export=ALL,KERNEL=avx512_s5_omp,SHAPE=all,NO_BUILD=1 \
        scripts/run_profile_s5.sh
 
 echo ""

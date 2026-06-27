@@ -29,13 +29,14 @@ echo "=== OMP Correctness — All kernels, Multi-thread ==="
 echo "Node: $(hostname)  Date: $(date)"
 echo ""
 
+BIN_SUFFIX="${BIN_SUFFIX:-_omp_s4}"
+make BIN_SUFFIX="$BIN_SUFFIX" 2>&1 | tail -2
 echo ""
-
-BIN="./build/test_correctness_omp_s4"
+BIN="./build/test_correctness${BIN_SUFFIX}"
 export OMP_PROC_BIND=spread
 export OMP_PLACES=cores
 
-THREADS="1 24 48 96"
+THREADS="${THREADS:-1 2 4 8 16 24 32 48 64 96}"
 
 OK=0
 FAIL=0
