@@ -53,10 +53,11 @@ echo "Threads: $THREAD_LIST"
 echo "Node: $(hostname)  Date: $(date)"
 echo ""
 
-# --- 编译（BIN_SUFFIX=_omp 隔离，不覆盖旧 binary）---
-BENCH_BIN="./build/benchmark_omp"
+# --- 编译 ---
+BIN_SUFFIX="${BIN_SUFFIX:-_omp}"
+BENCH_BIN="./build/benchmark${BIN_SUFFIX}"
 if [ "${NO_BUILD:-0}" != "1" ]; then
-    make clean BIN_SUFFIX=_omp && make BIN_SUFFIX=_omp
+    make clean BIN_SUFFIX="$BIN_SUFFIX" && make BIN_SUFFIX="$BIN_SUFFIX"
 fi
 echo ""
 

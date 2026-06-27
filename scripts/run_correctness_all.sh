@@ -1,11 +1,13 @@
 #!/bin/bash
 # ============================================================================
-# run_correctness_all.sh — 正确性验证提交 (OMP version, isolated binary)
+# run_correctness_all.sh — 正确性验证提交
 #
 # 用法:  bash scripts/run_correctness_all.sh
 # ============================================================================
 
-echo "=== Pre-building (BIN_SUFFIX=_omp, isolated from old binary) ==="
+echo "=== Building (BIN_SUFFIX=_omp) ==="
+make BIN_SUFFIX=_omp
+echo ""
 
 echo "=== Submitting correctness check ==="
 
@@ -19,4 +21,3 @@ sbatch \
     scripts/run_correctness.sh
 
 echo "Submitted.  Output:  logs/check_omp_<jobid>.out"
-echo "Monitor:  squeue -u \$USER"

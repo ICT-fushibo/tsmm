@@ -38,7 +38,9 @@ TESTDIR  := tests
 BUILDDIR := build
 
 # Source files (library)
-LIB_SRCS := $(SRCDIR)/tsmm_naive.c $(SRCDIR)/tsmm_tiled.c $(SRCDIR)/tsmm_tiled_omp.c $(SRCDIR)/tsmm_utils.c
+LIB_SRCS := $(SRCDIR)/tsmm_naive.c $(SRCDIR)/tsmm_tiled.c \
+            $(SRCDIR)/tsmm_tiled_omp.c $(SRCDIR)/tsmm_tiled_omp_s2.c \
+            $(SRCDIR)/tsmm_utils.c
 LIB_OBJS := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(LIB_SRCS))
 
 # Test executables (BIN_SUFFIX for isolated builds, e.g. _omp)
@@ -147,9 +149,17 @@ profile-submit:
 	sbatch scripts/run_profile.sh
 
 # --- Cleanup -----------------------------------------------------------
+# Only delete artefacts matching BIN_SUFFIX; never nuke the whole build/
 clean:
+	rm -f $(BUILDDIR)/test_correctness$(BIN_SUFFIX)      \
+	      $(BUILDDIR)/test_correctness$(BIN_SUFFIX).exe  \
+	      $(BUILDDIR)/benchmark$(BIN_SUFFIX)              \
+	      $(BUILDDIR)/benchmark$(BIN_SUFFIX).exe
+	@echo "==> Cleaned $(BIN_SUFFIX) executables."
+
+distclean:
 	rm -rf $(BUILDDIR)
-	@echo "==> Cleaned build directory."
+	@echo "==> Cleaned entire build directory."
 
 # --- Help --------------------------------------------------------------
 help:
