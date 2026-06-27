@@ -40,6 +40,7 @@ BUILDDIR := build
 # Source files (library)
 LIB_SRCS := $(SRCDIR)/tsmm_naive.c $(SRCDIR)/tsmm_tiled.c \
             $(SRCDIR)/tsmm_tiled_omp.c $(SRCDIR)/tsmm_tiled_omp_s2.c \
+            $(SRCDIR)/tsmm_tiled_omp_s3.c \
             $(SRCDIR)/tsmm_utils.c
 LIB_OBJS := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(LIB_SRCS))
 

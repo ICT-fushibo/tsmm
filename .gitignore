@@ -1,3 +1,6 @@
 *.exe
 build/
 logs/
+result/*
+
+!result/RESULTS.md
