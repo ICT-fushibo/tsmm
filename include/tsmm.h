@@ -152,6 +152,22 @@ void tsmm_tiled_omp_s3_mn(tsmm_layout_t layout, int m, int n, int k,
                            const double *A, const double *B, double *C,
                            int Ti, int Tj, int num_threads);
 
+/* ---------- OpenMP Step 4: 3D k-parallel + reduction (MN falls back to S3) ---------- */
+
+void tsmm_tiled_omp_s4_rowmajor(int m, int n, int k,
+                                 const double *A, const double *B, double *C,
+                                 int Ti, int Tj, int Tk, int num_threads);
+void tsmm_tiled_omp_s4(tsmm_layout_t layout, int m, int n, int k,
+                        const double *A, const double *B, double *C,
+                        int Ti, int Tj, int Tk, int num_threads);
+
+void tsmm_tiled_omp_s4_mn_rowmajor(int m, int n, int k,
+                                    const double *A, const double *B, double *C,
+                                    int Ti, int Tj, int num_threads);
+void tsmm_tiled_omp_s4_mn(tsmm_layout_t layout, int m, int n, int k,
+                           const double *A, const double *B, double *C,
+                           int Ti, int Tj, int num_threads);
+
 /* ---------- BLAS wrapper (requires -DTSMM_USE_BLAS) ---------- */
 #ifdef TSMM_USE_BLAS
 void tsmm_blas(tsmm_layout_t layout, int m, int n, int k,

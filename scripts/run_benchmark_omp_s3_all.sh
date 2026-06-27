@@ -8,7 +8,7 @@
 
 echo "=== Submitting Step 3 benchmark jobs (row-major only) ==="
 
-for KERN in omp_s3_3d omp_s3_mn; do
+for KERN in omp_s3_3d; do
     case "$KERN" in
         omp_s3_3d) KTAG="s3_3d" ;;
         omp_s3_mn) KTAG="s3_mn" ;;

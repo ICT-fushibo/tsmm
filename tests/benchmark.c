@@ -42,10 +42,13 @@
 #define KERNEL_OMP_S2_MN   (1<<6)
 #define KERNEL_OMP_S3_3D   (1<<7)
 #define KERNEL_OMP_S3_MN   (1<<8)
+#define KERNEL_OMP_S4_3D   (1<<9)
+#define KERNEL_OMP_S4_MN   (1<<10)
 #define KERNEL_ALL         (KERNEL_NAIVE | KERNEL_TILED_3D | KERNEL_TILED_MN | \
                             KERNEL_TILED_OMP_3D | KERNEL_TILED_OMP_MN | \
                             KERNEL_OMP_S2_3D | KERNEL_OMP_S2_MN | \
-                            KERNEL_OMP_S3_3D | KERNEL_OMP_S3_MN)
+                            KERNEL_OMP_S3_3D | KERNEL_OMP_S3_MN | \
+                            KERNEL_OMP_S4_3D | KERNEL_OMP_S4_MN)
 
 /* ---------- 命令行选项 ---------- */
 typedef struct {
@@ -326,6 +329,24 @@ static void bench_one(const tsmm_shape_t *shape, tsmm_layout_t layout,
                          have_baseline ? &p_naive_baseline : NULL);
     }
 
+    /* 10. Tiled OMP Step4 3D (k-parallel + reduction) */
+    if (opts->kernel_mask & KERNEL_OMP_S4_3D) {
+        TIME_KERNEL(1, tsmm_tiled_omp_s4(layout, m, n, k, A, B, C,
+                                         opts->Ti, opts->Tj, opts->Tk,
+                                         opts->num_threads));
+        bench_and_report("omp_s4_3d", shape, layout, min_time_s, opts,
+                         have_baseline ? &p_naive_baseline : NULL);
+    }
+
+    /* 11. Tiled OMP Step4 MN (fallback to S3) */
+    if (opts->kernel_mask & KERNEL_OMP_S4_MN) {
+        TIME_KERNEL(1, tsmm_tiled_omp_s4_mn(layout, m, n, k, A, B, C,
+                                            opts->Ti, opts->Tj,
+                                            opts->num_threads));
+        bench_and_report("omp_s4_mn", shape, layout, min_time_s, opts,
+                         have_baseline ? &p_naive_baseline : NULL);
+    }
+
     tsmm_free_matrix(A);
     tsmm_free_matrix(B);
     tsmm_free_matrix(C);
@@ -367,10 +388,13 @@ static void parse_args(int argc, char **argv, bench_opts_t *opts)
             else if (!strcmp(k, "omp_s2_mn"))      opts->kernel_mask = KERNEL_OMP_S2_MN;
             else if (!strcmp(k, "omp_s3_3d"))      opts->kernel_mask = KERNEL_OMP_S3_3D;
             else if (!strcmp(k, "omp_s3_mn"))      opts->kernel_mask = KERNEL_OMP_S3_MN;
+            else if (!strcmp(k, "omp_s4_3d"))      opts->kernel_mask = KERNEL_OMP_S4_3D;
+            else if (!strcmp(k, "omp_s4_mn"))      opts->kernel_mask = KERNEL_OMP_S4_MN;
             else if (!strcmp(k, "all"))            opts->kernel_mask = KERNEL_ALL;
             else if (!strcmp(k, "all_omp"))        opts->kernel_mask = KERNEL_TILED_OMP_3D | KERNEL_TILED_OMP_MN;
             else if (!strcmp(k, "all_omp_s2"))     opts->kernel_mask = KERNEL_OMP_S2_3D | KERNEL_OMP_S2_MN;
             else if (!strcmp(k, "all_omp_s3"))     opts->kernel_mask = KERNEL_OMP_S3_3D | KERNEL_OMP_S3_MN;
+            else if (!strcmp(k, "all_omp_s4"))     opts->kernel_mask = KERNEL_OMP_S4_3D | KERNEL_OMP_S4_MN;
             else { fprintf(stderr, "Unknown kernel: %s\n", k); exit(1); }
         }
         else if (!strcmp(argv[i], "--no-tiled"))

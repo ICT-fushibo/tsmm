@@ -1,10 +1,12 @@
 /**
- * tests/test_correctness.c — TSMM 正确性验证。
+ * tests/test_correctness.c — TSMM 正确性验证 (serial + OMP 全 kernel)
  *
  * 用法:
- *   ./build/test_correctness              # 测试全部 8 组 shape
- *   ./build/test_correctness 3            # 仅测试 shape 3
- *   ./build/test_correctness --large      # 不跳过大规模 shape
+ *   ./build/test_correctness                              # 全部 kernel, 1 thread
+ *   ./build/test_correctness 3                            # 仅 shape 3
+ *   ./build/test_correctness --kernel omp_s4_3d           # 仅 omp_s4_3d
+ *   ./build/test_correctness --threads 48                 # 48 线程 (测 race)
+ *   ./build/test_correctness --kernel omp_s4_3d --threads 96
  */
 
 #include "tsmm.h"
@@ -13,107 +15,151 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ---------- 可调参数 ---------- */
-#define TOLERANCE       (1e-10)   /* 相对误差容忍度，最终 tol = TOLERANCE * k */
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
-/* 测试用 tile sizes（保守，适应所有 shape） */
+/* ---------- 可调参数 ---------- */
+#define TOLERANCE       (1e-10)
+
 #define TEST_Ti  64
 #define TEST_Tj  128
 #define TEST_Tk  64
 
-/* 跳过超大 shape 的阈值（避免 reference 跑太久） */
-#define MAX_ELEMS_SLOW  (100 * 1000 * 1000)  /* C 元素数超过 1 亿则跳过 */
+#define MAX_ELEMS_SLOW  (100 * 1000 * 1000)
 
-/* ---------- helpers ---------- */
+/* ---------- 全局设置 ---------- */
+static int g_num_threads = 1;
+static const char *g_filter_kernel = NULL;  /* NULL = 全部 */
 
-/* 测试单个 kernel variant，返回 1=pass, 0=fail, -1=skip */
-static int test_kernel(
-    const char *kernel_name,
+/* ---------- kernel 注册表 ---------- */
+
+/* Unified kernel call signature:
+ * All kernels called as fn(layout,m,n,k,A,B,C,Ti,Tj,Tk,num_threads).
+ * Serial / MN kernels use wrappers to adapt. */
+typedef void (*kernel_fn_t)(tsmm_layout_t, int, int, int,
+    const double *, const double *, double *,
+    int, int, int, int);
+
+typedef struct {
+    const char *name;
+    kernel_fn_t fn;
+} kernel_entry_t;
+
+/* --- Wrappers for kernels with different signatures --- */
+static void _w_naive(tsmm_layout_t l, int m, int n, int k,
+    const double *A, const double *B, double *C,
+    int Ti, int Tj, int Tk, int nt)
+    { (void)Ti;(void)Tj;(void)Tk;(void)nt; tsmm_naive(l,m,n,k,A,B,C); }
+
+static void _w_tiled(tsmm_layout_t l, int m, int n, int k,
+    const double *A, const double *B, double *C,
+    int Ti, int Tj, int Tk, int nt)
+    { (void)nt; tsmm_tiled(l,m,n,k,A,B,C,Ti,Tj,Tk); }
+
+static void _w_tiled_mn(tsmm_layout_t l, int m, int n, int k,
+    const double *A, const double *B, double *C,
+    int Ti, int Tj, int Tk, int nt)
+    { (void)Tk;(void)nt; tsmm_tiled_mn(l,m,n,k,A,B,C,Ti,Tj); }
+
+static void _w_omp_mn(tsmm_layout_t l, int m, int n, int k,
+    const double *A, const double *B, double *C,
+    int Ti, int Tj, int Tk, int nt)
+    { (void)Tk; tsmm_tiled_omp_mn(l,m,n,k,A,B,C,Ti,Tj,nt); }
+
+static void _w_omp_s2_mn(tsmm_layout_t l, int m, int n, int k,
+    const double *A, const double *B, double *C,
+    int Ti, int Tj, int Tk, int nt)
+    { (void)Tk; tsmm_tiled_omp_s2_mn(l,m,n,k,A,B,C,Ti,Tj,nt); }
+
+static void _w_omp_s3_mn(tsmm_layout_t l, int m, int n, int k,
+    const double *A, const double *B, double *C,
+    int Ti, int Tj, int Tk, int nt)
+    { (void)Tk; tsmm_tiled_omp_s3_mn(l,m,n,k,A,B,C,Ti,Tj,nt); }
+
+static void _w_omp_s4_mn(tsmm_layout_t l, int m, int n, int k,
+    const double *A, const double *B, double *C,
+    int Ti, int Tj, int Tk, int nt)
+    { (void)Tk; tsmm_tiled_omp_s4_mn(l,m,n,k,A,B,C,Ti,Tj,nt); }
+
+static const kernel_entry_t g_kernels[] = {
+    {"naive",        _w_naive        },
+    {"tiled_3d",     _w_tiled        },
+    {"tiled_mn",     _w_tiled_mn     },
+    {"omp_3d",       tsmm_tiled_omp  },
+    {"omp_mn",       _w_omp_mn       },
+    {"omp_s2_3d",    tsmm_tiled_omp_s2},
+    {"omp_s2_mn",    _w_omp_s2_mn    },
+    {"omp_s3_3d",    tsmm_tiled_omp_s3},
+    {"omp_s3_mn",    _w_omp_s3_mn    },
+    {"omp_s4_3d",    tsmm_tiled_omp_s4},
+    {"omp_s4_mn",    _w_omp_s4_mn    },
+};
+#define N_KERNELS (sizeof(g_kernels) / sizeof(g_kernels[0]))
+
+/* ========================================================================== */
+
+static int test_kernel(const kernel_entry_t *ke,
     const tsmm_shape_t *shape, tsmm_layout_t layout,
-    const double *A, const double *B,
-    const double *C_ref)         /* 参考结果，已计算好 */
+    const double *A, const double *B, const double *C_ref)
 {
     int m = shape->m, n = shape->n, k = shape->k;
 
     double *C_my = tsmm_alloc_matrix(m, n);
-    if (C_my == NULL) {
-        printf("  %-20s  SKIP (alloc failed)\n", kernel_name);
-        return -1;
-    }
+    if (!C_my) { printf("  %-20s  SKIP\n", ke->name); return -1; }
     tsmm_init_zero(C_my, m, n);
 
-    /* 根据 kernel name 调度 */
-    if (!strcmp(kernel_name, "naive")) {
-        tsmm_naive(layout, m, n, k, A, B, C_my);
-    } else if (!strcmp(kernel_name, "tiled_3d")) {
-        tsmm_tiled(layout, m, n, k, A, B, C_my, TEST_Ti, TEST_Tj, TEST_Tk);
-    } else if (!strcmp(kernel_name, "tiled_mn")) {
-        tsmm_tiled_mn(layout, m, n, k, A, B, C_my, TEST_Ti, TEST_Tj);
-    } else {
-        printf("  %-20s  SKIP (unknown kernel)\n", kernel_name);
-        tsmm_free_matrix(C_my);
-        return -1;
-    }
+    ke->fn(layout, m, n, k, A, B, C_my,
+           TEST_Ti, TEST_Tj, TEST_Tk, g_num_threads);
 
     double max_diff = tsmm_max_abs_diff(C_my, C_ref, m, n);
     double tol = TOLERANCE * (double)k;
     if (tol < 1e-15) tol = 1e-15;
 
     int ok = tsmm_verify(C_my, C_ref, m, n, tol);
-    if (ok) {
-        printf("  %-20s  PASS  (max_diff=%.3e)\n", kernel_name, max_diff);
-    } else {
-        printf("  %-20s  FAIL  (max_diff=%.3e)\n", kernel_name, max_diff);
-    }
+    printf("  %-20s  %s  (max_diff=%.3e)\n", ke->name,
+           ok ? "PASS" : "FAIL", max_diff);
 
     tsmm_free_matrix(C_my);
     return ok;
 }
 
-/* ---------- 每个 (shape, layout) 对的测试 ---------- */
+/* ========================================================================== */
+
 static int test_one(const tsmm_shape_t *shape, tsmm_layout_t layout)
 {
     int m = shape->m, n = shape->n, k = shape->k;
 
-    /* 参考实现对小 shape 才跑得动（三重循环 i-j-p） */
-    size_t total_elems = (size_t)m * n;
-    if (total_elems > MAX_ELEMS_SLOW) {
-        printf("  (C too large for reference — skip this shape)\n");
-        return 1;  /* skip = 不扣分 */
+    size_t total = (size_t)m * n;
+    if (total > MAX_ELEMS_SLOW) {
+        printf("  (C too large for reference — skip)\n");
+        return 1;
     }
 
-    /* ---------- 分配 ---------- */
     double *A = tsmm_alloc_matrix(k, m);
     double *B = tsmm_alloc_matrix(k, n);
     double *C_ref = tsmm_alloc_matrix(m, n);
     if (!A || !B || !C_ref) {
-        printf("  SKIP (alloc failed)\n");
-        tsmm_free_matrix(A);
-        tsmm_free_matrix(B);
-        tsmm_free_matrix(C_ref);
-        return 1;
+        printf("  SKIP (alloc)\n");
+        tsmm_free_matrix(A); tsmm_free_matrix(B);
+        tsmm_free_matrix(C_ref); return 1;
     }
-
     tsmm_init_random(A, k, m);
     tsmm_init_random(B, k, n);
-
-    /* ---------- 计算参考结果 ---------- */
     tsmm_reference(layout, m, n, k, A, B, C_ref);
 
-    /* ---------- 测试每种 kernel ---------- */
     printf("  tol = %.2e\n", TOLERANCE * k);
 
     int all_pass = 1;
-    const char *kernels[] = { "naive", "tiled_3d", "tiled_mn" };
-    for (int ki = 0; ki < 3; ki++) {
-        int r = test_kernel(kernels[ki], shape, layout, A, B, C_ref);
+    for (size_t ki = 0; ki < N_KERNELS; ki++) {
+        if (g_filter_kernel && strcmp(g_kernels[ki].name, g_filter_kernel))
+            continue;
+        int r = test_kernel(&g_kernels[ki], shape, layout, A, B, C_ref);
         if (r == 0) all_pass = 0;
     }
 
-    tsmm_free_matrix(A);
-    tsmm_free_matrix(B);
+    tsmm_free_matrix(A); tsmm_free_matrix(B);
     tsmm_free_matrix(C_ref);
-
     return all_pass;
 }
 
@@ -121,47 +167,48 @@ static int test_one(const tsmm_shape_t *shape, tsmm_layout_t layout)
 
 int main(int argc, char **argv)
 {
-    int shape_start = 0;
-    int shape_end   = TSMM_NUM_SHAPES;
+    int shape_start = 0, shape_end = TSMM_NUM_SHAPES;
 
     for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "--large")) {
-            /* --large: 不跳过大规模 shape（慎用） */
-            /* 通过不跳过实现 — 只是把阈值改大 */
-            /* （已硬编码在 MAX_ELEMS_SLOW，这里仅标记） */
+        if (!strcmp(argv[i], "--threads") && i + 1 < argc) {
+            g_num_threads = atoi(argv[++i]);
+            if (g_num_threads < 1) g_num_threads = 1;
+        } else if (!strcmp(argv[i], "--kernel") && i + 1 < argc) {
+            g_filter_kernel = argv[++i];
         } else {
             int idx = atoi(argv[i]);
             if (idx >= 1 && idx <= TSMM_NUM_SHAPES) {
-                shape_start = idx - 1;
-                shape_end   = idx;
-            } else if (strcmp(argv[i], "--large")) {
-                fprintf(stderr, "Usage: %s [shape_index 1-%d] [--large]\n",
-                        argv[0], TSMM_NUM_SHAPES);
+                shape_start = idx - 1; shape_end = idx;
+            } else {
+                fprintf(stderr, "Usage: %s [shape] [--kernel X] [--threads N]\n", argv[0]);
                 return 1;
             }
         }
     }
 
-    tsmm_layout_t layouts[]      = { TSMM_ROW_MAJOR, TSMM_COL_MAJOR };
-    const char   *layout_names[] = { "ROW_MAJOR", "COL_MAJOR" };
+#ifdef _OPENMP
+    omp_set_num_threads(g_num_threads);
+#endif
 
-    int total  = 0;
-    int passed = 0;
+    tsmm_layout_t layouts[]       = { TSMM_ROW_MAJOR, TSMM_COL_MAJOR };
+    const char   *layout_names[]  = { "ROW_MAJOR", "COL_MAJOR" };
 
-    printf("=== TSMM Correctness Test ===\n");
-    printf("Kernels: naive, tiled_3d (Ti=%d,Tj=%d,Tk=%d), "
-           "tiled_mn (Ti=%d,Tj=%d)\n",
-           TEST_Ti, TEST_Tj, TEST_Tk, TEST_Ti, TEST_Tj);
-    printf("\n");
+    int total = 0, passed = 0;
 
-    for (int si = shape_start; si < shape_end; ++si) {
-        for (int li = 0; li < 2; ++li) {
+    printf("=== TSMM Correctness ===\n");
+    printf("Kernels: ");
+    for (size_t ki = 0; ki < N_KERNELS; ki++)
+        if (!g_filter_kernel || !strcmp(g_kernels[ki].name, g_filter_kernel))
+            printf("%s ", g_kernels[ki].name);
+    printf("\nThreads: %d\n\n", g_num_threads);
+
+    for (int si = shape_start; si < shape_end; si++) {
+        for (int li = 0; li < 2; li++) {
             printf("--- %s  [%s] ---\n",
                    tsmm_shapes[si].name, layout_names[li]);
             total++;
-
-            int ok = test_one(&tsmm_shapes[si], layouts[li]);
-            if (ok) { passed++; }
+            if (test_one(&tsmm_shapes[si], layouts[li]))
+                passed++;
             printf("\n");
         }
     }
@@ -169,3 +216,4 @@ int main(int argc, char **argv)
     printf("=== %d / %d test groups passed ===\n", passed, total);
     return (passed == total) ? 0 : 1;
 }
+
