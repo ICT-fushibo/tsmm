@@ -168,6 +168,15 @@ void tsmm_tiled_omp_s4_mn(tsmm_layout_t layout, int m, int n, int k,
                            const double *A, const double *B, double *C,
                            int Ti, int Tj, int num_threads);
 
+/* ---------- Stage 5: AVX-512 微内核 (8×16 register tile, serial) ---------- */
+
+void tsmm_avx512_s5_rowmajor(int m, int n, int k,
+                              const double *A, const double *B, double *C,
+                              int Ti, int Tj, int Tk);
+void tsmm_avx512_s5(tsmm_layout_t layout, int m, int n, int k,
+                     const double *A, const double *B, double *C,
+                     int Ti, int Tj, int Tk);
+
 /* ---------- BLAS wrapper (requires -DTSMM_USE_BLAS) ---------- */
 #ifdef TSMM_USE_BLAS
 void tsmm_blas(tsmm_layout_t layout, int m, int n, int k,
