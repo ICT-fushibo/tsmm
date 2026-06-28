@@ -168,7 +168,12 @@ void tsmm_tiled_omp_s4_rowmajor(int m, int n, int k,
     int total_tiles = nt_i * nt_j;
 
 #ifdef _OPENMP
-    if (total_tiles > 1000) {
+    int pk_iters = (k + Tk - 1) / Tk;  /* number of pk loop iterations */
+
+    /* S4 only beneficial when: tiles are few AND k has enough iterations to
+     * distribute across threads. Otherwise the per-tile overhead (critical,
+     * barrier) and idle threads dominate. */
+    if (total_tiles > 1000 || pk_iters < nt / 4) {
         tsmm_tiled_omp_s3_rowmajor(m, n, k, A, B, C, Ti, Tj, Tk, num_threads);
         return;
     }

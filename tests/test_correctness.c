@@ -82,18 +82,25 @@ static void _w_omp_s4_mn(tsmm_layout_t l, int m, int n, int k,
     int Ti, int Tj, int Tk, int nt)
     { (void)Tk; tsmm_tiled_omp_s4_mn(l,m,n,k,A,B,C,Ti,Tj,nt); }
 
+static void _w_avx512_s5(tsmm_layout_t l, int m, int n, int k,
+    const double *A, const double *B, double *C,
+    int Ti, int Tj, int Tk, int nt)
+    { (void)nt; tsmm_avx512_s5(l,m,n,k,A,B,C,Ti,Tj,Tk); }
+
 static const kernel_entry_t g_kernels[] = {
-    {"naive",        _w_naive        },
-    {"tiled_3d",     _w_tiled        },
-    {"tiled_mn",     _w_tiled_mn     },
-    {"omp_3d",       tsmm_tiled_omp  },
-    {"omp_mn",       _w_omp_mn       },
-    {"omp_s2_3d",    tsmm_tiled_omp_s2},
-    {"omp_s2_mn",    _w_omp_s2_mn    },
-    {"omp_s3_3d",    tsmm_tiled_omp_s3},
-    {"omp_s3_mn",    _w_omp_s3_mn    },
-    {"omp_s4_3d",    tsmm_tiled_omp_s4},
-    {"omp_s4_mn",    _w_omp_s4_mn    },
+    {"naive",          _w_naive          },
+    {"tiled_3d",       _w_tiled          },
+    {"tiled_mn",       _w_tiled_mn       },
+    {"omp_3d",         tsmm_tiled_omp    },
+    {"omp_mn",         _w_omp_mn         },
+    {"omp_s2_3d",      tsmm_tiled_omp_s2 },
+    {"omp_s2_mn",      _w_omp_s2_mn      },
+    {"omp_s3_3d",      tsmm_tiled_omp_s3 },
+    {"omp_s3_mn",      _w_omp_s3_mn      },
+    {"omp_s4_3d",      tsmm_tiled_omp_s4 },
+    {"omp_s4_mn",      _w_omp_s4_mn      },
+    {"avx512_s5",      _w_avx512_s5      },
+    {"avx512_s5_omp",  tsmm_avx512_s5_omp},
 };
 #define N_KERNELS (sizeof(g_kernels) / sizeof(g_kernels[0]))
 

@@ -47,14 +47,15 @@
 #define KERNEL_OMP_S4_MN   (1<<10)
 #define KERNEL_AVX512_S5      (1<<11)
 #define KERNEL_AVX512_S5_OMP  (1<<12)
-#define KERNEL_OPTIMAL        (1<<13)
+#define KERNEL_S6B            (1<<13)
+#define KERNEL_OPTIMAL        (1<<14)
 #define KERNEL_ALL         (KERNEL_NAIVE | KERNEL_TILED_3D | KERNEL_TILED_MN | \
                             KERNEL_TILED_OMP_3D | KERNEL_TILED_OMP_MN | \
                             KERNEL_OMP_S2_3D | KERNEL_OMP_S2_MN | \
                             KERNEL_OMP_S3_3D | KERNEL_OMP_S3_MN | \
                             KERNEL_OMP_S4_3D | KERNEL_OMP_S4_MN | \
                             KERNEL_AVX512_S5 | KERNEL_AVX512_S5_OMP | \
-                            KERNEL_OPTIMAL)
+                            KERNEL_S6B | KERNEL_OPTIMAL)
 
 /* ---------- 命令行选项 ---------- */
 typedef struct {
@@ -370,7 +371,15 @@ static void bench_one(const tsmm_shape_t *shape, tsmm_layout_t layout,
                          have_baseline ? &p_naive_baseline : NULL);
     }
 
-    /* 14. Optimal (auto-select best kernel + tiles from tsmm_tune.h) */
+    /* 14. S6b: S2 (8×16) full register-resident + k-parallel */
+    if (opts->kernel_mask & KERNEL_S6B) {
+        TIME_KERNEL(1, tsmm_s6b(layout, m, n, k, A, B, C,
+                                 opts->num_threads));
+        bench_and_report("s6b", shape, layout, min_time_s, opts,
+                         have_baseline ? &p_naive_baseline : NULL);
+    }
+
+    /* 15. Optimal (auto-select) */
     if (opts->kernel_mask & KERNEL_OPTIMAL) {
         int si = (int)(shape - tsmm_shapes);  /* shape index 0..7 */
         TIME_KERNEL(1, tsmm_optimal(si, layout, m, n, k, A, B, C,
@@ -424,6 +433,7 @@ static void parse_args(int argc, char **argv, bench_opts_t *opts)
             else if (!strcmp(k, "omp_s4_mn"))      opts->kernel_mask = KERNEL_OMP_S4_MN;
             else if (!strcmp(k, "avx512_s5"))      opts->kernel_mask = KERNEL_AVX512_S5;
             else if (!strcmp(k, "avx512_s5_omp"))  opts->kernel_mask = KERNEL_AVX512_S5_OMP;
+            else if (!strcmp(k, "s6b"))            opts->kernel_mask = KERNEL_S6B;
             else if (!strcmp(k, "optimal"))        opts->kernel_mask = KERNEL_OPTIMAL;
             else if (!strcmp(k, "all"))            opts->kernel_mask = KERNEL_ALL;
             else if (!strcmp(k, "all_omp"))        opts->kernel_mask = KERNEL_TILED_OMP_3D | KERNEL_TILED_OMP_MN;

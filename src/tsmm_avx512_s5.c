@@ -52,22 +52,22 @@ static inline void micro_kernel_8x16(
 {
 #ifdef __AVX512F__
     /* Step 1: load C tile into 16 ZMM registers */
-    __m512d c00 = _mm512_load_pd(&C[(ii + 0) * n + jj]);
-    __m512d c01 = _mm512_load_pd(&C[(ii + 0) * n + jj + 8]);
-    __m512d c10 = _mm512_load_pd(&C[(ii + 1) * n + jj]);
-    __m512d c11 = _mm512_load_pd(&C[(ii + 1) * n + jj + 8]);
-    __m512d c20 = _mm512_load_pd(&C[(ii + 2) * n + jj]);
-    __m512d c21 = _mm512_load_pd(&C[(ii + 2) * n + jj + 8]);
-    __m512d c30 = _mm512_load_pd(&C[(ii + 3) * n + jj]);
-    __m512d c31 = _mm512_load_pd(&C[(ii + 3) * n + jj + 8]);
-    __m512d c40 = _mm512_load_pd(&C[(ii + 4) * n + jj]);
-    __m512d c41 = _mm512_load_pd(&C[(ii + 4) * n + jj + 8]);
-    __m512d c50 = _mm512_load_pd(&C[(ii + 5) * n + jj]);
-    __m512d c51 = _mm512_load_pd(&C[(ii + 5) * n + jj + 8]);
-    __m512d c60 = _mm512_load_pd(&C[(ii + 6) * n + jj]);
-    __m512d c61 = _mm512_load_pd(&C[(ii + 6) * n + jj + 8]);
-    __m512d c70 = _mm512_load_pd(&C[(ii + 7) * n + jj]);
-    __m512d c71 = _mm512_load_pd(&C[(ii + 7) * n + jj + 8]);
+    __m512d c00 = _mm512_loadu_pd(&C[(ii + 0) * n + jj]);
+    __m512d c01 = _mm512_loadu_pd(&C[(ii + 0) * n + jj + 8]);
+    __m512d c10 = _mm512_loadu_pd(&C[(ii + 1) * n + jj]);
+    __m512d c11 = _mm512_loadu_pd(&C[(ii + 1) * n + jj + 8]);
+    __m512d c20 = _mm512_loadu_pd(&C[(ii + 2) * n + jj]);
+    __m512d c21 = _mm512_loadu_pd(&C[(ii + 2) * n + jj + 8]);
+    __m512d c30 = _mm512_loadu_pd(&C[(ii + 3) * n + jj]);
+    __m512d c31 = _mm512_loadu_pd(&C[(ii + 3) * n + jj + 8]);
+    __m512d c40 = _mm512_loadu_pd(&C[(ii + 4) * n + jj]);
+    __m512d c41 = _mm512_loadu_pd(&C[(ii + 4) * n + jj + 8]);
+    __m512d c50 = _mm512_loadu_pd(&C[(ii + 5) * n + jj]);
+    __m512d c51 = _mm512_loadu_pd(&C[(ii + 5) * n + jj + 8]);
+    __m512d c60 = _mm512_loadu_pd(&C[(ii + 6) * n + jj]);
+    __m512d c61 = _mm512_loadu_pd(&C[(ii + 6) * n + jj + 8]);
+    __m512d c70 = _mm512_loadu_pd(&C[(ii + 7) * n + jj]);
+    __m512d c71 = _mm512_loadu_pd(&C[(ii + 7) * n + jj + 8]);
 
     /* Step 2: loop over p, accumulate into registers */
     for (int p = pk; p < k_end; p++) {
@@ -117,22 +117,22 @@ static inline void micro_kernel_8x16(
     }
 
     /* Step 3: write C tile back */
-    _mm512_store_pd(&C[(ii + 0) * n + jj],      c00);
-    _mm512_store_pd(&C[(ii + 0) * n + jj + 8],  c01);
-    _mm512_store_pd(&C[(ii + 1) * n + jj],      c10);
-    _mm512_store_pd(&C[(ii + 1) * n + jj + 8],  c11);
-    _mm512_store_pd(&C[(ii + 2) * n + jj],      c20);
-    _mm512_store_pd(&C[(ii + 2) * n + jj + 8],  c21);
-    _mm512_store_pd(&C[(ii + 3) * n + jj],      c30);
-    _mm512_store_pd(&C[(ii + 3) * n + jj + 8],  c31);
-    _mm512_store_pd(&C[(ii + 4) * n + jj],      c40);
-    _mm512_store_pd(&C[(ii + 4) * n + jj + 8],  c41);
-    _mm512_store_pd(&C[(ii + 5) * n + jj],      c50);
-    _mm512_store_pd(&C[(ii + 5) * n + jj + 8],  c51);
-    _mm512_store_pd(&C[(ii + 6) * n + jj],      c60);
-    _mm512_store_pd(&C[(ii + 6) * n + jj + 8],  c61);
-    _mm512_store_pd(&C[(ii + 7) * n + jj],      c70);
-    _mm512_store_pd(&C[(ii + 7) * n + jj + 8],  c71);
+    _mm512_storeu_pd(&C[(ii + 0) * n + jj],      c00);
+    _mm512_storeu_pd(&C[(ii + 0) * n + jj + 8],  c01);
+    _mm512_storeu_pd(&C[(ii + 1) * n + jj],      c10);
+    _mm512_storeu_pd(&C[(ii + 1) * n + jj + 8],  c11);
+    _mm512_storeu_pd(&C[(ii + 2) * n + jj],      c20);
+    _mm512_storeu_pd(&C[(ii + 2) * n + jj + 8],  c21);
+    _mm512_storeu_pd(&C[(ii + 3) * n + jj],      c30);
+    _mm512_storeu_pd(&C[(ii + 3) * n + jj + 8],  c31);
+    _mm512_storeu_pd(&C[(ii + 4) * n + jj],      c40);
+    _mm512_storeu_pd(&C[(ii + 4) * n + jj + 8],  c41);
+    _mm512_storeu_pd(&C[(ii + 5) * n + jj],      c50);
+    _mm512_storeu_pd(&C[(ii + 5) * n + jj + 8],  c51);
+    _mm512_storeu_pd(&C[(ii + 6) * n + jj],      c60);
+    _mm512_storeu_pd(&C[(ii + 6) * n + jj + 8],  c61);
+    _mm512_storeu_pd(&C[(ii + 7) * n + jj],      c70);
+    _mm512_storeu_pd(&C[(ii + 7) * n + jj + 8],  c71);
 
 #else
     (void)m; (void)n; (void)A; (void)B; (void)C;
@@ -223,7 +223,11 @@ void tsmm_avx512_s5_omp_rowmajor(int m, int n, int k,
 
     #pragma omp parallel num_threads(nt)
     {
+#ifdef __AVX512F__
+        double *buf = (double*)_mm_malloc((size_t)Ti * Tj * sizeof(double), 64);
+#else
         double *buf = (double*)calloc((size_t)Ti * Tj, sizeof(double));
+#endif
         if (!buf) { fprintf(stderr, "s5_omp: buf alloc failed\n"); exit(1); }
 
         #pragma omp for collapse(2) schedule(static)
@@ -244,22 +248,22 @@ void tsmm_avx512_s5_omp_rowmajor(int m, int n, int k,
                     for (int i = ii; i < i_avx; i += TR) {
                         for (int j = jj; j < j_avx; j += TC) {
                             /* inline micro-kernel writing to buf */
-                            __m512d c00 = _mm512_load_pd(&buf[(i - ii) * Tj + (j - jj)]);
-                            __m512d c01 = _mm512_load_pd(&buf[(i - ii) * Tj + (j - jj) + 8]);
-                            __m512d c10 = _mm512_load_pd(&buf[(i + 1 - ii) * Tj + (j - jj)]);
-                            __m512d c11 = _mm512_load_pd(&buf[(i + 1 - ii) * Tj + (j - jj) + 8]);
-                            __m512d c20 = _mm512_load_pd(&buf[(i + 2 - ii) * Tj + (j - jj)]);
-                            __m512d c21 = _mm512_load_pd(&buf[(i + 2 - ii) * Tj + (j - jj) + 8]);
-                            __m512d c30 = _mm512_load_pd(&buf[(i + 3 - ii) * Tj + (j - jj)]);
-                            __m512d c31 = _mm512_load_pd(&buf[(i + 3 - ii) * Tj + (j - jj) + 8]);
-                            __m512d c40 = _mm512_load_pd(&buf[(i + 4 - ii) * Tj + (j - jj)]);
-                            __m512d c41 = _mm512_load_pd(&buf[(i + 4 - ii) * Tj + (j - jj) + 8]);
-                            __m512d c50 = _mm512_load_pd(&buf[(i + 5 - ii) * Tj + (j - jj)]);
-                            __m512d c51 = _mm512_load_pd(&buf[(i + 5 - ii) * Tj + (j - jj) + 8]);
-                            __m512d c60 = _mm512_load_pd(&buf[(i + 6 - ii) * Tj + (j - jj)]);
-                            __m512d c61 = _mm512_load_pd(&buf[(i + 6 - ii) * Tj + (j - jj) + 8]);
-                            __m512d c70 = _mm512_load_pd(&buf[(i + 7 - ii) * Tj + (j - jj)]);
-                            __m512d c71 = _mm512_load_pd(&buf[(i + 7 - ii) * Tj + (j - jj) + 8]);
+                            __m512d c00 = _mm512_loadu_pd(&buf[(i - ii) * Tj + (j - jj)]);
+                            __m512d c01 = _mm512_loadu_pd(&buf[(i - ii) * Tj + (j - jj) + 8]);
+                            __m512d c10 = _mm512_loadu_pd(&buf[(i + 1 - ii) * Tj + (j - jj)]);
+                            __m512d c11 = _mm512_loadu_pd(&buf[(i + 1 - ii) * Tj + (j - jj) + 8]);
+                            __m512d c20 = _mm512_loadu_pd(&buf[(i + 2 - ii) * Tj + (j - jj)]);
+                            __m512d c21 = _mm512_loadu_pd(&buf[(i + 2 - ii) * Tj + (j - jj) + 8]);
+                            __m512d c30 = _mm512_loadu_pd(&buf[(i + 3 - ii) * Tj + (j - jj)]);
+                            __m512d c31 = _mm512_loadu_pd(&buf[(i + 3 - ii) * Tj + (j - jj) + 8]);
+                            __m512d c40 = _mm512_loadu_pd(&buf[(i + 4 - ii) * Tj + (j - jj)]);
+                            __m512d c41 = _mm512_loadu_pd(&buf[(i + 4 - ii) * Tj + (j - jj) + 8]);
+                            __m512d c50 = _mm512_loadu_pd(&buf[(i + 5 - ii) * Tj + (j - jj)]);
+                            __m512d c51 = _mm512_loadu_pd(&buf[(i + 5 - ii) * Tj + (j - jj) + 8]);
+                            __m512d c60 = _mm512_loadu_pd(&buf[(i + 6 - ii) * Tj + (j - jj)]);
+                            __m512d c61 = _mm512_loadu_pd(&buf[(i + 6 - ii) * Tj + (j - jj) + 8]);
+                            __m512d c70 = _mm512_loadu_pd(&buf[(i + 7 - ii) * Tj + (j - jj)]);
+                            __m512d c71 = _mm512_loadu_pd(&buf[(i + 7 - ii) * Tj + (j - jj) + 8]);
 
                             for (int p = pk; p < k_end; p++) {
                                 __m512d b0 = _mm512_loadu_pd(&B[p * n + j]);
@@ -282,22 +286,22 @@ void tsmm_avx512_s5_omp_rowmajor(int m, int n, int k,
                                 c70 = _mm512_fmadd_pd(a7, b0, c70); c71 = _mm512_fmadd_pd(a7, b1, c71);
                             }
 
-                            _mm512_store_pd(&buf[(i - ii) * Tj + (j - jj)],      c00);
-                            _mm512_store_pd(&buf[(i - ii) * Tj + (j - jj) + 8],  c01);
-                            _mm512_store_pd(&buf[(i + 1 - ii) * Tj + (j - jj)],      c10);
-                            _mm512_store_pd(&buf[(i + 1 - ii) * Tj + (j - jj) + 8],  c11);
-                            _mm512_store_pd(&buf[(i + 2 - ii) * Tj + (j - jj)],      c20);
-                            _mm512_store_pd(&buf[(i + 2 - ii) * Tj + (j - jj) + 8],  c21);
-                            _mm512_store_pd(&buf[(i + 3 - ii) * Tj + (j - jj)],      c30);
-                            _mm512_store_pd(&buf[(i + 3 - ii) * Tj + (j - jj) + 8],  c31);
-                            _mm512_store_pd(&buf[(i + 4 - ii) * Tj + (j - jj)],      c40);
-                            _mm512_store_pd(&buf[(i + 4 - ii) * Tj + (j - jj) + 8],  c41);
-                            _mm512_store_pd(&buf[(i + 5 - ii) * Tj + (j - jj)],      c50);
-                            _mm512_store_pd(&buf[(i + 5 - ii) * Tj + (j - jj) + 8],  c51);
-                            _mm512_store_pd(&buf[(i + 6 - ii) * Tj + (j - jj)],      c60);
-                            _mm512_store_pd(&buf[(i + 6 - ii) * Tj + (j - jj) + 8],  c61);
-                            _mm512_store_pd(&buf[(i + 7 - ii) * Tj + (j - jj)],      c70);
-                            _mm512_store_pd(&buf[(i + 7 - ii) * Tj + (j - jj) + 8],  c71);
+                            _mm512_storeu_pd(&buf[(i - ii) * Tj + (j - jj)],      c00);
+                            _mm512_storeu_pd(&buf[(i - ii) * Tj + (j - jj) + 8],  c01);
+                            _mm512_storeu_pd(&buf[(i + 1 - ii) * Tj + (j - jj)],      c10);
+                            _mm512_storeu_pd(&buf[(i + 1 - ii) * Tj + (j - jj) + 8],  c11);
+                            _mm512_storeu_pd(&buf[(i + 2 - ii) * Tj + (j - jj)],      c20);
+                            _mm512_storeu_pd(&buf[(i + 2 - ii) * Tj + (j - jj) + 8],  c21);
+                            _mm512_storeu_pd(&buf[(i + 3 - ii) * Tj + (j - jj)],      c30);
+                            _mm512_storeu_pd(&buf[(i + 3 - ii) * Tj + (j - jj) + 8],  c31);
+                            _mm512_storeu_pd(&buf[(i + 4 - ii) * Tj + (j - jj)],      c40);
+                            _mm512_storeu_pd(&buf[(i + 4 - ii) * Tj + (j - jj) + 8],  c41);
+                            _mm512_storeu_pd(&buf[(i + 5 - ii) * Tj + (j - jj)],      c50);
+                            _mm512_storeu_pd(&buf[(i + 5 - ii) * Tj + (j - jj) + 8],  c51);
+                            _mm512_storeu_pd(&buf[(i + 6 - ii) * Tj + (j - jj)],      c60);
+                            _mm512_storeu_pd(&buf[(i + 6 - ii) * Tj + (j - jj) + 8],  c61);
+                            _mm512_storeu_pd(&buf[(i + 7 - ii) * Tj + (j - jj)],      c70);
+                            _mm512_storeu_pd(&buf[(i + 7 - ii) * Tj + (j - jj) + 8],  c71);
                         }
                     }
 #endif
@@ -327,7 +331,11 @@ void tsmm_avx512_s5_omp_rowmajor(int m, int n, int k,
                         C[i * n + j] += buf[(i - ii) * Tj + (j - jj)];
             }
         }
+#ifdef __AVX512F__
+        _mm_free(buf);
+#else
         free(buf);
+#endif
     }
 #else
     /* No OpenMP: fallback to serial S5 */
