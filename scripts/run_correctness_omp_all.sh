@@ -53,10 +53,10 @@ for NT in $THREADS; do
     echo ""
     if [ $rc -eq 0 ]; then
         echo "  Threads=$NT : ALL PASS"
-        ((OK++))
+        OK=$((OK + 1))
     else
         echo "  Threads=$NT : FAILURES DETECTED"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
     echo ""
 done

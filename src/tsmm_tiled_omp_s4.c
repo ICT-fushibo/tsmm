@@ -161,68 +161,75 @@ void tsmm_tiled_omp_s4_rowmajor(int m, int n, int k,
     (void)num_threads;
 #endif
 
-#ifdef _OPENMP
-#pragma omp parallel num_threads(nt)
-{
-    double *local  = calloc(Ti * Tj, sizeof(double));  // 线程私有
-    double *shared = NULL;                              // team 共享, 每个 tile 重新分配
-    if (!local) { fprintf(stderr, "..."); exit(1); }
-    // 手动 tile 遍历（每个 tile 所有线程合作处理）
+    /* Performance guard: S4 per-tile overhead too high for many tiles.
+     * Fall back to S3 when tiles > 1000 (e.g. S1: 38750, S8: 4404). */
     int nt_i = (m + Ti - 1) / Ti;
     int nt_j = (n + Tj - 1) / Tj;
     int total_tiles = nt_i * nt_j;
-    for (int tile = 0; tile < total_tiles; tile++) {
-        int ii = (tile / nt_j) * Ti;
-        int jj = (tile % nt_j) * Tj;
-        int i_end = MIN(ii + Ti, m);
-        int j_end = MIN(jj + Tj, n);
-        // ① 分配 shared buffer（一个线程做）
-        #pragma omp single
-        {
-            shared = calloc(Ti * Tj, sizeof(double));
-            // shared 在 omp single 内分配，所有线程可见（shared 是 shared 变量）
-        }
-        // implicit barrier after single
-        // ② 清零 local
-        memset(local, 0, (size_t)Ti * Tj * sizeof(double));
-        // ③ 所有线程并行 pk
-        #pragma omp for schedule(static) nowait
-        for (int pk = 0; pk < k; pk += Tk) {
-            int k_end = MIN(pk + Tk, k);
-            for (int p = pk; p < k_end; p++) {
-                for (int i = ii; i < i_end; i++) {
-                    double a_ip = A[p * m + i];
-                    for (int j = jj; j < j_end; j++) {
-                        local[(i-ii)*Tj + (j-jj)] += a_ip * B[p*n+j];
+
+#ifdef _OPENMP
+    if (total_tiles > 1000) {
+        tsmm_tiled_omp_s3_rowmajor(m, n, k, A, B, C, Ti, Tj, Tk, num_threads);
+        return;
+    }
+
+    /* shared: allocated ONCE, reused per tile via memset (saves malloc/free per tile) */
+    double *shared = malloc((size_t)Ti * Tj * sizeof(double));
+    if (!shared) { fprintf(stderr, "s4: shared alloc failed\n"); exit(1); }
+
+    #pragma omp parallel num_threads(nt)
+    {
+        double *local = calloc(Ti * Tj, sizeof(double));  /* thread-private */
+        if (!local) { fprintf(stderr, "s4: local alloc failed\n"); exit(1); }
+
+        for (int tile = 0; tile < total_tiles; tile++) {
+            int ii = (tile / nt_j) * Ti;
+            int jj = (tile % nt_j) * Tj;
+            int i_end = MIN(ii + Ti, m);
+            int j_end = MIN(jj + Tj, n);
+
+            /* ① zero shared (one thread; implicit barrier after single) */
+            #pragma omp single
+            memset(shared, 0, (size_t)Ti * Tj * sizeof(double));
+
+            /* ② zero local */
+            memset(local, 0, (size_t)Ti * Tj * sizeof(double));
+
+            /* ③ parallel pk */
+            #pragma omp for schedule(static)
+            for (int pk = 0; pk < k; pk += Tk) {
+                int k_end = MIN(pk + Tk, k);
+                for (int p = pk; p < k_end; p++) {
+                    for (int i = ii; i < i_end; i++) {
+                        double a_ip = A[p * m + i];
+                        for (int j = jj; j < j_end; j++) {
+                            local[(i-ii)*Tj + (j-jj)] += a_ip * B[p*n+j];
+                        }
                     }
                 }
             }
+            /* implicit barrier after omp for */
+
+            /* ④ reduction: local → shared (serialized, correctness over speed) */
+            #pragma omp critical
+            {
+                for (int i = ii; i < i_end; i++)
+                    for (int j = jj; j < j_end; j++)
+                        shared[(i-ii)*Tj + (j-jj)] += local[(i-ii)*Tj + (j-jj)];
+            }
+            #pragma omp barrier
+
+            /* ⑤ writeback shared → C (one thread; implicit barrier after single) */
+            #pragma omp single
+            {
+                for (int i = ii; i < i_end; i++)
+                    for (int j = jj; j < j_end; j++)
+                        C[i*n+j] += shared[(i-ii)*Tj + (j-jj)];
+            }
         }
-        // nowait: 每个线程完成自己的 pk 后可以继续
-        // 但规约前必须等所有线程完成 → 需要显式 barrier
-        #pragma omp barrier
-        // ④ 规约: local → shared
-        #pragma omp critical
-        {
-            // 只累加这个 tile 实际使用的元素
-            for (int i = ii; i < i_end; i++)
-                for (int j = jj; j < j_end; j++)
-                    shared[(i-ii)*Tj + (j-jj)] += local[(i-ii)*Tj + (j-jj)];
-        }
-        #pragma omp barrier
-        // ⑤ 写回 shared → C（一个线程做）
-        #pragma omp single
-        {
-            for (int i = ii; i < i_end; i++)
-                for (int j = jj; j < j_end; j++)
-                    C[i*n+j] += shared[(i-ii)*Tj + (j-jj)];
-            free(shared);
-            shared = NULL;
-        }
-        // implicit barrier
+        free(local);
     }
-    free(local);
-}
+    free(shared);
 #else
     /* 串行 fallback */
     for (int ii = 0; ii < m; ii += Ti) {
