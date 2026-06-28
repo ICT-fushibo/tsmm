@@ -2,6 +2,7 @@
  * src/tsmm_utils.c — 工具函数：内存管理、计时、校验、性能统计。
  */
 
+#define _GNU_SOURCE   /* MAP_HUGETLB */
 #include "tsmm.h"
 
 #include <stdio.h>
@@ -16,6 +17,8 @@
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #  include <malloc.h>         /* _aligned_malloc, _aligned_free */
+#else
+#  include <sys/mman.h>       /* mmap, munmap, MAP_HUGETLB */
 #endif
 
 /* ==========================================================================
@@ -38,23 +41,53 @@ const tsmm_shape_t tsmm_shapes[TSMM_NUM_SHAPES] = {
 
 #define TSMM_ALIGNMENT 64   /* bytes — AVX-512 对齐要求 */
 
+#if !defined(_WIN32)
+#define HUGE_PAGE_SIZE (2UL * 1024 * 1024)  /* 2 MB */
+#endif
+
 double* tsmm_alloc_matrix(int rows, int cols)
 {
     size_t nbytes;
-    /* 检查溢出 */
     if (rows <= 0 || cols <= 0) return NULL;
     if ((size_t)rows > SIZE_MAX / sizeof(double) / (size_t)cols)
-        return NULL;   /* 乘法会溢出 */
+        return NULL;
     nbytes = (size_t)rows * cols * sizeof(double);
 
 #if defined(_WIN32)
     return (double*)_aligned_malloc(nbytes, TSMM_ALIGNMENT);
 #else
-    /* POSIX: 使用 posix_memalign——没有 aligned_alloc 的 size-alignment 约束 */
-    void *ptr = NULL;
-    if (posix_memalign(&ptr, TSMM_ALIGNMENT, nbytes) != 0)
-        return NULL;
-    return (double*)ptr;
+    /* Header: 2 × size_t before aligned user pointer.
+     *   meta[0] = mmap total size (or 0 for posix_memalign fallback)
+     *   meta[1] = magic 0x48554745 ("HUGE") if huge pages used, else 0 */
+    size_t payload = nbytes + 2 * sizeof(size_t) + 63;
+    size_t huge_size = (payload + HUGE_PAGE_SIZE - 1) & ~(HUGE_PAGE_SIZE - 1);
+    size_t reg_size  = (payload + 4095) & ~4095UL;
+
+    void *base = NULL;
+    size_t total = 0;
+    int huge = 0;
+
+    /* Try huge pages first */
+    base = mmap(NULL, huge_size, PROT_READ | PROT_WRITE,
+                MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
+    if (base != MAP_FAILED) {
+        total = huge_size;
+        huge = 1;
+    } else {
+        /* Fallback: regular mmap (avoids posix_memalign free() issue) */
+        base = mmap(NULL, reg_size, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (base == MAP_FAILED) return NULL;
+        total = reg_size;
+    }
+
+    /* Align to 64 bytes after the metadata header */
+    char *aligned = (char*)(((uintptr_t)base + 2 * sizeof(size_t) + 63) & ~63ULL);
+    size_t *meta  = (size_t*)(aligned - 2 * sizeof(size_t));
+    meta[0] = total;
+    meta[1] = huge ? 0x48554745UL : 0UL;   /* "HUGE" */
+
+    return (double*)aligned;
 #endif
 }
 
@@ -64,7 +97,26 @@ void tsmm_free_matrix(double *mat)
 #if defined(_WIN32)
     _aligned_free(mat);
 #else
-    free(mat);
+    size_t *meta  = (size_t*)mat - 2;
+    size_t  total = meta[0];
+    void   *base  = (char*)meta - (2 * sizeof(size_t)) + (uintptr_t)((char*)mat - (char*)(meta + 2));
+    /* Recompute base: mat = align(base + 2*sizeof(size_t), 64)
+     * We stored meta at (mat - 2*sizeof(size_t)). The base is somewhere before meta.
+     * Simplest: base = (void*)((uintptr_t)meta & ~(HUGE_PAGE_SIZE - 1)) for huge,
+     *            or page-aligned for regular. But we don't know which...
+     * Instead: stored total is the mmap size, so:
+     *   if meta[1] == 0x48554745: base is huge-page-aligned
+     *   else: base is 4K-page-aligned
+     * We just need to find the page start. For huge, it's 2MB-aligned;
+     * for regular, it's 4KB-aligned. Since both are powers of 2 and we know
+     * total, we can mask differently. But we don't know which without meta[1].
+     * Safe approach: use the stored total to determine alignment.
+     */
+    if (meta[1] == 0x48554745UL)
+        base = (void*)((uintptr_t)meta & ~(HUGE_PAGE_SIZE - 1));
+    else
+        base = (void*)((uintptr_t)meta & ~4095UL);
+    munmap(base, total);
 #endif
 }
 

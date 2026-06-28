@@ -48,14 +48,23 @@
 #define KERNEL_AVX512_S5      (1<<11)
 #define KERNEL_AVX512_S5_OMP  (1<<12)
 #define KERNEL_S6B            (1<<13)
-#define KERNEL_OPTIMAL        (1<<14)
+#define KERNEL_S6A            (1<<14)
+#define KERNEL_S6C            (1<<15)
+#define KERNEL_S6D            (1<<16)
+#define KERNEL_S6E            (1<<17)
+#define KERNEL_S6F            (1<<18)
+#define KERNEL_S6G            (1<<19)
+#define KERNEL_S6H            (1<<20)
+#define KERNEL_OPTIMAL        (1<<21)
 #define KERNEL_ALL         (KERNEL_NAIVE | KERNEL_TILED_3D | KERNEL_TILED_MN | \
                             KERNEL_TILED_OMP_3D | KERNEL_TILED_OMP_MN | \
                             KERNEL_OMP_S2_3D | KERNEL_OMP_S2_MN | \
                             KERNEL_OMP_S3_3D | KERNEL_OMP_S3_MN | \
                             KERNEL_OMP_S4_3D | KERNEL_OMP_S4_MN | \
                             KERNEL_AVX512_S5 | KERNEL_AVX512_S5_OMP | \
-                            KERNEL_S6B | KERNEL_OPTIMAL)
+                            KERNEL_S6B | KERNEL_S6A | KERNEL_S6C | \
+                            KERNEL_S6D | KERNEL_S6E | KERNEL_S6F | \
+                            KERNEL_S6G | KERNEL_S6H | KERNEL_OPTIMAL)
 
 /* ---------- 命令行选项 ---------- */
 typedef struct {
@@ -371,7 +380,7 @@ static void bench_one(const tsmm_shape_t *shape, tsmm_layout_t layout,
                          have_baseline ? &p_naive_baseline : NULL);
     }
 
-    /* 14. S6b: S2 (8×16) full register-resident + k-parallel */
+    /* 14. S6b: S2 full register-resident + k-parallel */
     if (opts->kernel_mask & KERNEL_S6B) {
         TIME_KERNEL(1, tsmm_s6b(layout, m, n, k, A, B, C,
                                  opts->num_threads));
@@ -379,7 +388,24 @@ static void bench_one(const tsmm_shape_t *shape, tsmm_layout_t layout,
                          have_baseline ? &p_naive_baseline : NULL);
     }
 
-    /* 15. Optimal (auto-select) */
+    /* 15. S6 per-shape optimizations */
+    #define BENCH_S6(kern, fn) \
+    if (opts->kernel_mask & KERNEL_##kern) { \
+        TIME_KERNEL(1, fn(layout, m, n, k, A, B, C, \
+                           opts->Ti, opts->Tj, opts->Tk, opts->num_threads)); \
+        bench_and_report(#kern, shape, layout, min_time_s, opts, \
+                         have_baseline ? &p_naive_baseline : NULL); \
+    }
+    BENCH_S6(S6A, tsmm_s6a)
+    BENCH_S6(S6C, tsmm_s6c)
+    BENCH_S6(S6D, tsmm_s6d)
+    BENCH_S6(S6E, tsmm_s6e)
+    BENCH_S6(S6F, tsmm_s6f)
+    BENCH_S6(S6G, tsmm_s6g)
+    BENCH_S6(S6H, tsmm_s6h)
+    #undef BENCH_S6
+
+    /* 16. Optimal (auto-select) */
     if (opts->kernel_mask & KERNEL_OPTIMAL) {
         int si = (int)(shape - tsmm_shapes);  /* shape index 0..7 */
         TIME_KERNEL(1, tsmm_optimal(si, layout, m, n, k, A, B, C,
@@ -433,8 +459,15 @@ static void parse_args(int argc, char **argv, bench_opts_t *opts)
             else if (!strcmp(k, "omp_s4_mn"))      opts->kernel_mask = KERNEL_OMP_S4_MN;
             else if (!strcmp(k, "avx512_s5"))      opts->kernel_mask = KERNEL_AVX512_S5;
             else if (!strcmp(k, "avx512_s5_omp"))  opts->kernel_mask = KERNEL_AVX512_S5_OMP;
-            else if (!strcmp(k, "s6b"))            opts->kernel_mask = KERNEL_S6B;
-            else if (!strcmp(k, "optimal"))        opts->kernel_mask = KERNEL_OPTIMAL;
+            else if (!strcmp(k, "s6a"))  opts->kernel_mask = KERNEL_S6A;
+            else if (!strcmp(k, "s6b"))  opts->kernel_mask = KERNEL_S6B;
+            else if (!strcmp(k, "s6c"))  opts->kernel_mask = KERNEL_S6C;
+            else if (!strcmp(k, "s6d"))  opts->kernel_mask = KERNEL_S6D;
+            else if (!strcmp(k, "s6e"))  opts->kernel_mask = KERNEL_S6E;
+            else if (!strcmp(k, "s6f"))  opts->kernel_mask = KERNEL_S6F;
+            else if (!strcmp(k, "s6g"))  opts->kernel_mask = KERNEL_S6G;
+            else if (!strcmp(k, "s6h"))  opts->kernel_mask = KERNEL_S6H;
+            else if (!strcmp(k, "optimal")) opts->kernel_mask = KERNEL_OPTIMAL;
             else if (!strcmp(k, "all"))            opts->kernel_mask = KERNEL_ALL;
             else if (!strcmp(k, "all_omp"))        opts->kernel_mask = KERNEL_TILED_OMP_3D | KERNEL_TILED_OMP_MN;
             else if (!strcmp(k, "all_omp_s2"))     opts->kernel_mask = KERNEL_OMP_S2_3D | KERNEL_OMP_S2_MN;

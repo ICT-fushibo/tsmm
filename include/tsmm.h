@@ -177,6 +177,50 @@ void tsmm_s6b(tsmm_layout_t layout, int m, int n, int k,
               const double *A, const double *B, double *C,
               int num_threads);
 
+/* S6a-h: per-shape optimizations */
+void tsmm_s6a_rowmajor(int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int num_threads);
+void tsmm_s6a(tsmm_layout_t l, int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int nt);
+void tsmm_s6c_rowmajor(int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int num_threads);
+void tsmm_s6c(tsmm_layout_t l, int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int nt);
+void tsmm_s6d_rowmajor(int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int num_threads);
+void tsmm_s6d(tsmm_layout_t l, int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int nt);
+void tsmm_s6e_rowmajor(int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int num_threads);
+void tsmm_s6e(tsmm_layout_t l, int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int nt);
+void tsmm_s6f_rowmajor(int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int num_threads);
+void tsmm_s6f(tsmm_layout_t l, int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int nt);
+void tsmm_s6g_rowmajor(int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int num_threads);
+void tsmm_s6g(tsmm_layout_t l, int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int nt);
+void tsmm_s6h_rowmajor(int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int num_threads);
+void tsmm_s6h(tsmm_layout_t l, int m, int n, int k,
+        const double *A, const double *B, double *C,
+        int Ti, int Tj, int Tk, int nt);
+
 /* ---------- Stage 5: AVX-512 微内核 (8×16 register tile) ---------- */
 
 void tsmm_avx512_s5_rowmajor(int m, int n, int k,
